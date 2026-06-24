@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>門市週清輪值系統</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .notice {
+            background-color: #eef2f7;
+            border-left: 5px solid #3498db;
+            padding: 15px;
+            margin-bottom: 25px;
+            border-radius: 4px;
+        }
+        .notice ol {
+            margin: 5px 0 0 20px;
+            padding: 0;
+        }
+        .notice li {
+            margin-bottom: 5px;
+        }
+        .control-panel {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 20px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        select, button, input[type="text"] {
+            padding: 8px 12px;
+            font-size: 14px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        select {
+            background-color: white;
+            min-width: 160px;
+            cursor: pointer;
+            display: inline-block !important;
+        }
+        input[type="text"] {
+            background-color: white;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.done-btn {
+            background-color: #2ecc71;
+        }
+        button.done-btn:hover {
+            background-color: #27ae60;
+        }
+        button.danger-btn {
+            background-color: #e74c3c;
+        }
+        button.danger-btn:hover {
+            background-color: #c0392b;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+            background: white;
+        }
+        th, td {
+            border: 1px solid #dfe6e9;
+            padding: 10px;
+            text-align: center;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #2c3e50;
+            font-weight: 600;
+        }
+        tr:nth-child(even) {
+            background-color: #fbfbfc;
+        }
+        .current-user-row {
+            background-color: #e8f4fd !important;
+            font-weight: bold;
+        }
+        .date-display {
+            font-weight: bold;
+            color: #27ae60;
+        }
+        .admin-box {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #fff5f5;
+            border: 1px dashed #e74c3c;
+            border-radius: 8px;
+        }
+        .admin-box h3 {
+            margin-top: 0;
+            color: #c0392b;
+        }
+        .member-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .member-tag {
+            background: #f1f2f6;
+            padding: 5px 10px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid #ced6e0;
+        }
+        .footer-note {
+            margin-top: 20px;
+            text-align: right;
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>門市週清輪值系統</h1>
+    
+    <div class="notice">
+        <strong>門市清潔內容：請確實於該輪值的日期內完成（週末客流較多，請務必於週五前完成）</strong>
+        <ol>
+            <li>倉庫多餘紙箱移除</li>
+            <li>陳列品除塵 (櫥櫃 & 書桌 & 餐桌 & 立燈灰塵 & 商品檯面)</li>
+            <li>全區域地板吸塵</li>
+            <li>工作區檯面除塵 (包含檯面 & 印表機除塵)</li>
+            <li>拖鞋層架清潔</li>
+        </ol>
+    </div>
+
+    <!-- 控制面板 -->
+    <div class="control-panel">
+        <div class="control-group">
+            <label style="font-weight: bold;">🔑 當前登入帳號：</label>
+            <select id="userSelect" onchange="updateView()">
+                <!-- 動態載入 -->
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label style="font-weight: bold;">📅 選擇排程月份：</label>
+            <select id="monthSelect" onchange="changeMonth()">
+                <!-- 動態載入 -->
+            </select>
+        </div>
+        <span style="color: #7f8c8d; font-size: 13px;" id="sysHint">* 選擇您自己的名字即可開啟當週完成選項</span>
+    </div>
+
+    <!-- 輪值表格 -->
+    <table>
+        <thead>
+            <tr>
+                <th style="width: 15%;">週次 (一 ~ 五)</th>
+                <th style="width: 13%;">輪值人員</th>
+                <th>1. 倉庫紙箱</th>
+                <th>2. 陳列除塵</th>
+                <th>3. 地板吸塵</th>
+                <th>4. 工作區檯面</th>
+                <th>5. 拖鞋層架</th>
+                <th style="width: 15%;">主管檢查簽核</th>
+            </tr>
+        </thead>
+        <tbody id="scheduleBody">
+            <!-- 資料由 JavaScript 渲染 -->
+        </tbody>
+    </table>
+
+    <!-- 主管後台 -->
+    <div id="adminPanel" class="admin-box" style="display: none;">
+        <h3>🛠️ 主管專屬後台：人員名單管理</h3>
+        <p style="font-size: 13px; color: #555;">在此處新增或移除員工，上方表格的「輪值人員下拉選單」會同步更新。</p>
+        <div class="control-group">
+            <input type="text" id="newMemberInput" placeholder="輸入新員工名字 (例如: Zoe)">
+            <button onclick="addMember()">➕ 新增員工</button>
+        </div>
+        <div class="member-tags" id="memberTagsContainer">
+            <!-- 員工標籤 -->
+        </div>
+    </div>
+
+    <div class="footer-note">最後一位完成請交給 店長 / 督導</div>
+</div>
+
+<script>
+    // 清理舊版本快取干擾
+    localStorage.removeItem('storeWorkers');
+    localStorage.removeItem('storeWorkersV2');
+    localStorage.removeItem('storeWorkersV3');
+    localStorage.removeItem('storeCleanStorage');
+    localStorage.removeItem('storeCleanStorageV2');
+    localStorage.removeItem('storeCleanStorageV3');
+
+    // 核心固定邏輯
+    const defaultWorkers = ["Ray", "Rio", "Veronica", "Henry"];
+    let globalWorkers = JSON.parse(localStorage.getItem('finalWorkersListV5'));
+    if (!globalWorkers || !Array.isArray(globalWorkers) || globalWorkers.length === 0) {
+        globalWorkers = [...defaultWorkers];
+        localStorage.setItem('finalWorkersListV5', JSON.stringify(globalWorkers));
+    }
+
+    let allScheduleStorage = JSON.parse(localStorage.getItem('finalScheduleDataV5')) || {};
+
+    // 強制重寫並固定 2026-06 的排程
+    allScheduleStorage["2026-06"] = [
+        { week: "6/8-6/12", worker: "Ray", task1: "6/9", task2: "6/9", task3: "6/9", task4: "6/9", task5: "6/9", supervisor: "6/10" },
+        { week: "6/15-6/19", worker: "Rio", task1: "6/17", task2: "6/17", task3: "6/17", task4: "6/17", task5: "6/17", supervisor: "6/18" },
+        { week: "6/22-6/26", worker: "Veronica", task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: "" },
+        { week: "6/29-7/3", worker: "Henry", task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: "" }
+    ];
+    localStorage.setItem('finalScheduleDataV5', JSON.stringify(allScheduleStorage));
+
+    // 初始化月份選單
+    function initMonthSelect() {
+        const monthSelect = document.getElementById('monthSelect');
+        if (!monthSelect) return;
+        monthSelect.innerHTML = "";
+        
+        const months = ["2026-05", "2026-06", "2026-07", "2026-08", "2026-09"];
+        const monthLabels = ["2026 年 5 月", "2026 年 6 月", "2026 年 7 月", "2026 年 8 月", "2026 年 9 月"];
+        
+        months.forEach((m, idx) => {
+            const option = document.createElement('option');
+            option.value = m;
+            option.textContent = monthLabels[idx];
+            monthSelect.appendChild(option);
+        });
+        monthSelect.value = "2026-06";
+    }
+
+    // 初始化使用者
+    function initUserSelect() {
+        const userSelect = document.getElementById('userSelect');
+        if (!userSelect) return;
+        
+        const previousUser = userSelect.value;
+        userSelect.innerHTML = "";
+        
+        globalWorkers.forEach(w => {
+            const opt = document.createElement('option');
+            opt.value = w;
+            opt.textContent = w;
+            userSelect.appendChild(opt);
+        });
+        
+        const optAuth = document.createElement('option');
+        optAuth.value = "Supervisor";
+        optAuth.textContent = "主管 (店長/督導)";
+        userSelect.appendChild(optAuth);
+        
+        if (previousUser && [...userSelect.options].some(o => o.value === previousUser)) {
+            userSelect.value = previousUser;
+        } else {
+            userSelect.value = "Veronica";
+        }
+    }
+
+    function generateWeeksForMonth(year, month1Based) {
+        const weeks = [];
+        const monthIndex = month1Based - 1;
+        let firstDay = new Date(year, monthIndex, 1);
+        let dayOfWeek = firstDay.getDay();
+        let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+        let currentMonday = new Date(year, monthIndex, 1 + diffToMonday);
+        let workerIndex = (year - 2026) * 12 + monthIndex; 
+
+        while (currentMonday.getFullYear() < year || currentMonday.getMonth() <= monthIndex) {
+            if (currentMonday.getFullYear() === year && currentMonday.getMonth() < monthIndex && new Date(currentMonday.getTime() + 4*24*60*60*1000).getMonth() < monthIndex) {
+                currentMonday.setDate(currentMonday.getDate() + 7);
+                continue;
+            }
+            let currentFriday = new Date(currentMonday.getTime() + 4 * 24 * 60 * 60 * 1000);
+            let weekStr = `${currentMonday.getMonth() + 1}/${currentMonday.getDate()}-${currentFriday.getMonth() + 1}/${currentFriday.getDate()}`;
+
+            weeks.push({
+                week: weekStr,
+                worker: globalWorkers.length > 0 ? globalWorkers[workerIndex % globalWorkers.length] : "未指派",
+                task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: ""
+            });
+            workerIndex++;
+            currentMonday.setDate(currentMonday.getDate() + 7);
+        }
+        return weeks;
+    }
+
+    function getSelectedMonthData() {
+        const selectedMonth = document.getElementById('monthSelect').value;
+        if (!allScheduleStorage[selectedMonth] || allScheduleStorage[selectedMonth].length === 0) {
+            const [y, m] = selectedMonth.split('-');
+            allScheduleStorage[selectedMonth] = generateWeeksForMonth(parseInt(y), parseInt(m));
+            localStorage.setItem('finalScheduleDataV5', JSON.stringify(allScheduleStorage));
+        }
+        return allScheduleStorage[selectedMonth];
+    }
+
+    function changeMonth() { updateView(); }
+    function updateView() { renderTable(); renderAdminPanel(); }
+
+    function updateWeekRange(rowIndex, newStr) {
+        const selectedMonth = document.getElementById('monthSelect').value;
+        allScheduleStorage[selectedMonth][rowIndex].week = newStr;
+        localStorage.setItem('finalScheduleDataV5', JSON.stringify(allScheduleStorage));
+    }
+
+    function updateWeekWorker(rowIndex, newWorker) {
+        const selectedMonth = document.getElementById('monthSelect').value;
+        allScheduleStorage[selectedMonth][rowIndex].worker = newWorker;
+        localStorage.setItem('finalScheduleDataV5', JSON.stringify(allScheduleStorage));
+        renderTable();
+    }
+
+    function completeTask(rowIndex, taskKey) {
+        const selectedMonth = document.getElementById('monthSelect').value;
+        const currentData = allScheduleStorage[selectedMonth];
+        const taskNameMap = {
+            task1: "1. 倉庫多餘紙箱移除", task2: "2. 陳列品除塵", task3: "3. 全區域地板吸塵",
+            task4: "4. 工作區檯面除塵", task5: "5. 拖鞋層架清潔", supervisor: "主管檢查簽核"
+        };
+
+        const confirmCheck = confirm(`確定已現場核對並完成【${taskNameMap[taskKey]}】的工作內容嗎？`);
+        if (!confirmCheck) return;
+
+        const now = new Date();
+        currentData[rowIndex][taskKey] = `${now.getMonth() + 1}/${now.getDate()}`;
+        localStorage.setItem('finalScheduleDataV5', JSON.stringify(allScheduleStorage));
+        renderTable();
+    }
+
+    function renderTable() {
+        const userSelect = document.getElementById('userSelect');
+        const monthSelect = document.getElementById('monthSelect');
+        if (!userSelect || !monthSelect) return;
+
+        const currentUser = userSelect.value;
+        const currentData = getSelectedMonthData();
+        const tbody = document.getElementById('scheduleBody');
+        tbody.innerHTML = "";
+
+        const isSupervisor = (currentUser === 'Supervisor');
+
+        document.getElementById('sysHint').innerHTML = isSupervisor ? 
+            `<span style="color:#e74c3c; font-weight:bold;">🔓 主管管理模式已開啟：可直接修改日期與人員</span>` : 
+            `* 選擇您自己的名字即可開啟當週完成選項`;
+
+        currentData.forEach((row, index) => {
+            const tr = document.createElement('tr');
+            const isMyRow = (currentUser === row.worker);
+
+            if (isMyRow && !isSupervisor) {
+                tr.classList.add('current-user-row');
+            }
+
+            // 週次
+            const tdWeek = document.createElement('td');
+            if (isSupervisor) {
+                tdWeek.innerHTML = `<input type="text" value="${row.week}" style="width:85%; text-align:center;" onchange="updateWeekRange(${index}, this.value)">`;
+            } else {
+                tdWeek.textContent = row.week;
+            }
+            tr.appendChild(tdWeek);
+
+            // 人員
+            const tdWorker = document.createElement('td');
+            if (isSupervisor) {
+                let workerSelectHtml = `<select onchange="updateWeekWorker(${index}, this.value)" style="padding:4px; font-size:13px; min-width:90px;">`;
+                globalWorkers.forEach(w => {
+                    const selected = (w === row.worker) ? "selected" : "";
+                    workerSelectHtml += `<option value="${w}" ${selected}>${w}</option>`;
+                });
+                workerSelectHtml += `</select>`;
+                tdWorker.innerHTML = workerSelectHtml;
+            } else {
+                tdWorker.textContent = row.worker;
+            }
+            tr.appendChild(tdWorker);
+
+            // 任務 1 ~ 5
+            for (let i = 1; i <= 5; i++) {
+                const taskKey = `task${i}`;
+                const td = document.createElement('td');
+
+                if (row[taskKey]) {
+                    td.innerHTML = `<span class="date-display">${row[taskKey]}</span>`;
+                } else {
+                    if (isMyRow) {
+                        td.innerHTML = `<button class="done-btn" onclick="completeTask(${index}, '${taskKey}')">完成</button>`;
+                    } else {
+                        td.innerHTML = `<span style="color:#bcbcbc; font-size:12px;">待 ${row.worker}</span>`;
+                    }
+                }
+                tr.appendChild(td);
+            }
+
+            // 主管
+            const superTd = document.createElement('td');
+            if (row.supervisor) {
+                superTd.innerHTML = `<span class="date-display" style="color:#e74c3c;">${row.supervisor} 已檢查</span>`;
+            } else {
+                if (isSupervisor) {
+                    superTd.innerHTML = `<button onclick="completeTask(${index}, 'supervisor')">檢查通過</button>`;
+                } else {
+                    superTd.innerHTML = `<span style="color:#bcbcbc; font-size:12px;">待簽核</span>`;
+                }
+            }
+            tr.appendChild(superTd);
+            tbody.appendChild(tr);
+        });
+    }
+
+    function renderAdminPanel() {
+        const currentUser = document.getElementById('userSelect').value;
+        const adminPanel = document.getElementById('adminPanel');
+        if (!adminPanel) return;
+        
+        if (currentUser === 'Supervisor') {
+            adminPanel.style.display = 'block';
+            const container = document.getElementById('memberTagsContainer');
+            if (!container) return;
+            container.innerHTML = "";
+            
+            globalWorkers.forEach((w, idx) => {
+                const tag = document.createElement('div');
+                tag.className = 'member-tag';
+                tag.innerHTML = `<span>${w}</span><button class="danger-btn" style="padding:2px 6px; font-size:11px;" onclick="removeMember(${idx})">離職/刪除</button>`;
+                container.appendChild(tag);
+            });
+        } else {
+            adminPanel.style.display = 'none';
+        }
+    }
+
+    function addMember() {
+        const input = document.getElementById('newMemberInput');
+        const name = input.value.trim();
+        if (!name) return alert('請輸入員工姓名！');
+        if (globalWorkers.includes(name)) return alert('該員工已在名單中！');
+        
+        globalWorkers.push(name);
+        localStorage.setItem('finalWorkersListV5', JSON.stringify(globalWorkers));
+        input.value = "";
+        initUserSelect();
+        updateView();
+    }
+
+    function removeMember(index) {
+        if (confirm(`確定要從員工名單中移除【${globalWorkers[index]}】嗎？`)) {
+            globalWorkers.splice(index, 1);
+            localStorage.setItem('finalWorkersListV5', JSON.stringify(globalWorkers));
+            initUserSelect();
+            updateView();
+        }
+    }
+
+    window.onload = function() {
+        initMonthSelect();
+        initUserSelect();
+        updateView();
+    };
+</script>
+
+</body>
+</html>
+
