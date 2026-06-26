@@ -100,7 +100,7 @@
 </div>
 
 <script>
-    // 已自動黏妥您的專屬 Firebase 金鑰 (並補上 databaseURL)
+    // 已為您黏妥您的專屬 Firebase 金鑰
     const firebaseConfig = {
         apiKey: "AIzaSyBWTUzWb6p7cFVZZOg_jXc5BNSyuaObIoY",
         authDomain: "mrl-clean.firebaseapp.com",
@@ -115,7 +115,7 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    // 歷史排序絕對基準點：2026/06/08 由 Ray 開始不間斷循環
+    // 終極絕對時間軸定義：2026/06/08 固定為 Ray 開始，一週接一週不中斷
     const baseDate = new Date(2026, 5, 8); 
     const baseWorkersOrder = ["Ray", "Rio", "Veronica", "Henry"];
 
@@ -123,13 +123,13 @@
     let allScheduleStorage = {};
 
     // 監聽雲端資料庫
-    db.ref("cleanSystemV6").on("value", (snapshot) => {
+    db.ref("cleanSystemV7").on("value", (snapshot) => {
         const data = snapshot.val();
         if (data) {
             if (data.workers) globalWorkers = data.workers;
             if (data.schedules) allScheduleStorage = data.schedules;
             
-            // 首次初始化補齊 2026-06 歷史正確進度
+            // 初始化補齊 2026-06 歷史正確進度
             if (!allScheduleStorage["2026-06"]) {
                 allScheduleStorage["2026-06"] = [
                     { week: "6/8-6/12", worker: "Ray", task1: "6/9", task2: "6/9", task3: "6/9", task4: "6/9", task5: "6/9", supervisor: "6/10" },
@@ -137,13 +137,13 @@
                     { week: "6/22-6/26", worker: "Veronica", task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: "" },
                     { week: "6/29-7/3", worker: "Henry", task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: "" }
                 ];
-                db.ref("cleanSystemV6/schedules/2026-06").set(allScheduleStorage["2026-06"]);
+                db.ref("cleanSystemV7/schedules/2026-06").set(allScheduleStorage["2026-06"]);
             }
             initUserSelect();
             renderTable();
             renderAdminPanel();
         } else {
-            db.ref("cleanSystemV6").set({ workers: globalWorkers });
+            db.ref("cleanSystemV7").set({ workers: globalWorkers });
         }
     });
 
@@ -181,38 +181,36 @@
         }
     }
 
+    // 終極時間軸演算法：一週只要週五有落入該月份，就歸屬於該月份顯示
     function generateWeeksForMonth(year, month1Based) {
         const weeks = [];
         const monthIndex = month1Based - 1;
         
-        let firstDay = new Date(year, monthIndex, 1);
-        let dayOfWeek = firstDay.getDay();
-        let diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-        let currentMonday = new Date(year, monthIndex, 1 + diffToMonday);
-
-        let currentFriday = new Date(currentMonday.getTime() + 4 * 24 * 60 * 60 * 1000);
-        if (currentFriday.getMonth() < monthIndex) {
-            currentMonday.setDate(currentMonday.getDate() + 7);
-        }
-
-        while (currentMonday.getMonth() === monthIndex || new Date(currentMonday.getTime() + 4 * 24 * 60 * 60 * 1000).getMonth() === monthIndex) {
-            let fri = new Date(currentMonday.getTime() + 4 * 24 * 60 * 60 * 1000);
-            let weekStr = `${currentMonday.getMonth() + 1}/${currentMonday.getDate()}-${fri.getMonth() + 1}/${fri.getDate()}`;
-
-            const timeDiff = currentMonday.getTime() - baseDate.getTime();
-            const weeksDiff = Math.round(timeDiff / (7 * 24 * 60 * 60 * 1000));
+        // 往前推到 2026/06/08，依序往後加 7 天，去找出所有週五落在這個月的週次
+        let currentMonday = new Date(baseDate.getTime());
+        
+        // 往前或往後循環一年，確保抓到所有日子
+        for (let i = 0; i < 52; i++) {
+            let currentFriday = new Date(currentMonday.getTime() + 4 * 24 * 60 * 60 * 1000);
             
-            let workerIdx = weeksDiff % baseWorkersOrder.length;
-            if (workerIdx < 0) workerIdx += baseWorkersOrder.length;
-            
-            const calculatedWorker = baseWorkersOrder[workerIdx];
-
-            weeks.push({
-                week: weekStr,
-                worker: globalWorkers.includes(calculatedWorker) ? calculatedWorker : (globalWorkers[0] || "未指派"),
-                task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: ""
-            });
-            
+            // 只要週五在這個月，這週就屬於這個月！
+            if (currentFriday.getFullYear() === year && currentFriday.getMonth() === monthIndex) {
+                let weekStr = `${currentMonday.getMonth() + 1}/${currentMonday.getDate()}-${currentFriday.getMonth() + 1}/${currentFriday.getDate()}`;
+                
+                // 依據距離基準點隔了幾週，推算出絕對不變的輪值人員
+                const timeDiff = currentMonday.getTime() - baseDate.getTime();
+                const weeksDiff = Math.round(timeDiff / (7 * 24 * 60 * 60 * 1000));
+                let workerIdx = weeksDiff % baseWorkersOrder.length;
+                if (workerIdx < 0) workerIdx += baseWorkersOrder.length;
+                
+                const calculatedWorker = baseWorkersOrder[workerIdx];
+                
+                weeks.push({
+                    week: weekStr,
+                    worker: globalWorkers.includes(calculatedWorker) ? calculatedWorker : (globalWorkers[0] || "未指派"),
+                    task1: "", task2: "", task3: "", task4: "", task5: "", supervisor: ""
+                });
+            }
             currentMonday.setDate(currentMonday.getDate() + 7);
         }
         return weeks;
@@ -223,7 +221,7 @@
         if (!allScheduleStorage[selectedMonth]) {
             const [y, m] = selectedMonth.split('-');
             allScheduleStorage[selectedMonth] = generateWeeksForMonth(parseInt(y), parseInt(m));
-            db.ref(`cleanSystemV6/schedules/${selectedMonth}`).set(allScheduleStorage[selectedMonth]);
+            db.ref(`cleanSystemV7/schedules/${selectedMonth}`).set(allScheduleStorage[selectedMonth]);
         }
         return allScheduleStorage[selectedMonth];
     }
@@ -233,12 +231,12 @@
 
     function updateWeekRange(rowIndex, newStr) {
         const selectedMonth = document.getElementById('monthSelect').value;
-        db.ref(`cleanSystemV6/schedules/${selectedMonth}/${rowIndex}/week`).set(newStr);
+        db.ref(`cleanSystemV7/schedules/${selectedMonth}/${rowIndex}/week`).set(newStr);
     }
 
     function updateWeekWorker(rowIndex, newWorker) {
         const selectedMonth = document.getElementById('monthSelect').value;
-        db.ref(`cleanSystemV6/schedules/${selectedMonth}/${rowIndex}/worker`).set(newWorker);
+        db.ref(`cleanSystemV7/schedules/${selectedMonth}/${rowIndex}/worker`).set(newWorker);
     }
 
     function completeTask(rowIndex, taskKey) {
@@ -247,7 +245,7 @@
         if (!confirm(`確定已現場核對並完成【${taskNameMap[taskKey]}】嗎？`)) return;
 
         const now = new Date();
-        db.ref(`cleanSystemV6/schedules/${selectedMonth}/${rowIndex}/${taskKey}`).set(`${now.getMonth() + 1}/${now.getDate()}`);
+        db.ref(`cleanSystemV7/schedules/${selectedMonth}/${rowIndex}/${taskKey}`).set(`${now.getMonth() + 1}/${now.getDate()}`);
     }
 
     function renderTable() {
@@ -350,14 +348,14 @@
         const name = input.value.trim();
         if (!name || globalWorkers.includes(name)) return alert('名字空白或已存在！');
         globalWorkers.push(name);
-        db.ref("cleanSystemV6/workers").set(globalWorkers);
+        db.ref("cleanSystemV7/workers").set(globalWorkers);
         input.value = "";
     }
 
     function removeMember(index) {
         if (confirm(`確定要移除【${globalWorkers[index]}】嗎？`)) {
             globalWorkers.splice(index, 1);
-            db.ref("cleanSystemV6/workers").set(globalWorkers);
+            db.ref("cleanSystemV7/workers").set(globalWorkers);
         }
     }
 
